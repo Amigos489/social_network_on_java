@@ -1,14 +1,13 @@
 package social_network;
 
+import social_network.Service.*;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.cfg.Configuration;
-import social_network.repository.dao.*;
-import social_network.repository.entity.*;
-import social_network.service.ServiceFacade;
+import social_network.entity.*;
+import social_network.repository.*;
 
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,57 +16,57 @@ public class Main {
     public static void main(String[] args) {
 
         Configuration configuration = new Configuration();
-        configuration.configure().addAnnotatedClass(User.class)
+        configuration.configure()
+                .addAnnotatedClass(User.class)
+                .addAnnotatedClass(Profile.class)
+                .addAnnotatedClass(Post.class)
+                .addAnnotatedClass(FriendInvitation.class)
                 .addAnnotatedClass(Message.class)
-                    .addAnnotatedClass(Chat.class)
-                        .addAnnotatedClass(Profile.class)
-                            .addAnnotatedClass(Post.class);;
+                .addAnnotatedClass(PersonalChat.class)
+                .addAnnotatedClass(GroupChat.class)
+                .addAnnotatedClass(Community.class)
+                .addAnnotatedClass(CreatorCommunity.class)
+                .addAnnotatedClass(CreatorGroupChat.class)
+                .addAnnotatedClass(UserPost.class);
 
         SessionFactory sessionFactory = configuration.buildSessionFactory();
         Session session = sessionFactory.openSession();
 
+        UserRepository userRepository = new UserRepository(session);
+
+        UserService userService = new UserService(userRepository);
+
+        ProfileRepository profileRepository = new ProfileRepository(session);
+
+        ProfileService profileService = new ProfileService(profileRepository);
+
+        MessageService messageService = new MessageService(new MessageRepository(session));
+
+        ChatService chatService = new ChatService(new PersonalChatRepository(session), new GroupChatRepository(session), new CreatorGroupChatRepository(session));
+
+        FriendInvitationService friendInvitationService = new FriendInvitationService(new FriendInvitationRepository(session));
+
+        PostRepository postRepository = new PostRepository(session);
+
+        PostService postService = new PostService(postRepository);
+
+        CommunityService communityService = new CommunityService(new CommunityRepository(session),
+                new CreatorCommunityRepository(session),
+                new UserPostRepository(session), postRepository);
+
+        ServiceFacade serviceFacade = new ServiceFacade(userService, profileService, messageService, chatService, friendInvitationService, postService, communityService);
+
         session.beginTransaction();
 
-        User user1 = new User("Костин", "Дмитрий", "Сергеевич", 19, true);
-        User user2 = new User("Мраков", "Виталий", "Александрович", 20, true);
-        session.persist(user1);
-        session.persist(user2);
-
-//        User user1 = session.find(User.class, 1);
-//        User user2 = session.find(User.class, 2);
-
-
-//        Chat chat = session.find(Chat.class, 1);
-
-//        Message message = new Message("Привет!", LocalDate.now(), LocalTime.now(), user2, chat);
-//        chat.getMessages().add(message);
+//        serviceFacade.registerUser("Григорий", "Хайбернетов", "grigoriy", "kolyanpassword");
 //
-//        session.persist(message);
+//        serviceFacade.registerUser("Иван", "Ентерпрайсов", "ivan", "vitalikpassword");
 //
-//        Message message_2 = new Message("Дарова!", LocalDate.now(), LocalTime.now(), user2, chat);
-//        chat.getMessages().add(message_2);
+//        serviceFacade.registerUser("Дмитрий", "Костин", "dimon", "dimonpassword");
 //
-//        session.persist(message_2);
+//        serviceFacade.registerUser("Василий", "Полиморфный", "vasya", "dimonpassword");
 //
-//        Message message_3 = new Message("Как оно?", LocalDate.now(), LocalTime.now(), user1, chat);
-//        chat.getMessages().add(message_3);
-//
-//        session.persist(message_3);
-
-        ProfileDao profileDao = new ProfileDao(session);
-
-        Profile profile1 = profileDao.createNewProfile(user1);
-        Profile profile2 = profileDao.createNewProfile(user2);
-
-        PostDao postDao = new PostDao(session);
-
-        Post post1 = postDao.createNewPost("Я в отпуск!");
-
-        List<Post> posts = profileDao.addNewPostInProfile(post1, profile1);
-
-        for (Post post : posts) {
-            System.out.println(post.getContent());
-        }
+//        serviceFacade.registerUser("Николай", "Лямбдов", "kolya", "kolyapassword");
 
         session.getTransaction().commit();
     }
