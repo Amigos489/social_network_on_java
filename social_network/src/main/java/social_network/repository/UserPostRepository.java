@@ -2,15 +2,15 @@ package social_network.repository;
 
 import org.hibernate.Session;
 import social_network.entity.Post;
-import social_network.entity.UserPost;
+import social_network.entity.AuthorPostInCommunity;
 import social_network.primarykey.UserPostPrimaryKey;
 
 import java.util.List;
 
-public class UserPostRepository extends AbstractRepository<UserPost, UserPostPrimaryKey> {
+public class UserPostRepository extends AbstractRepository<AuthorPostInCommunity, UserPostPrimaryKey> {
 
     public UserPostRepository(Session session) {
-        super(UserPost.class, session);
+        super(AuthorPostInCommunity.class, session);
     }
 
     public List<Post> findAllPostByCommunityId(Integer communityId) {

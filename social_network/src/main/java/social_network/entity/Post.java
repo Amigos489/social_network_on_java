@@ -3,6 +3,7 @@ package social_network.entity;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Entity
@@ -16,19 +17,15 @@ public class Post {
     @Column(name = "content", nullable = false, length = 100)
     private String content;
 
-    @Column(name = "date_publication", nullable = false)
-    private LocalDate datePublication;
-
-    @Column(name = "time_publication", nullable = false)
-    private LocalTime timePublication;
+    @Column(name = "date_time_publication", nullable = false)
+    private LocalDateTime dateTimePublication;
 
     public Post() {
     }
 
     public Post(String content) {
         this.content = content;
-        this.datePublication = LocalDate.now();
-        this.timePublication = LocalTime.now();
+        this.dateTimePublication = LocalDateTime.now();
     }
 
     public Integer getId() {
@@ -39,11 +36,7 @@ public class Post {
         return content;
     }
 
-    public LocalDate getDatePublication() {
-        return datePublication;
-    }
-
-    public LocalTime getTimePublication() {
-        return timePublication;
+    public LocalDateTime getDateTimePublication() {
+        return dateTimePublication;
     }
 }

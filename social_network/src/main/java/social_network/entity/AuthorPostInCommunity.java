@@ -6,16 +6,16 @@ import jakarta.persistence.Table;
 import social_network.primarykey.UserPostPrimaryKey;
 
 @Entity
-@Table(name = "user_post")
-public class UserPost {
+@Table(name = "author_post_in_community")
+public class AuthorPostInCommunity {
 
     @EmbeddedId
     private UserPostPrimaryKey primaryKey;
 
-    public UserPost() {
+    public AuthorPostInCommunity() {
     }
 
-    public UserPost(UserPostPrimaryKey primaryKey) {
+    public AuthorPostInCommunity(UserPostPrimaryKey primaryKey) {
         this.primaryKey = primaryKey;
     }
 

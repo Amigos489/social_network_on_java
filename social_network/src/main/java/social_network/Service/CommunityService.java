@@ -101,7 +101,7 @@ public class CommunityService {
         throw new ErrorDeletingException(String.format("User with id = %d cannot kick a user with id = %d", userWhoKick.getId(), userForKick.getId()));
     }
 
-    public UserPost publishPostInCommunityById(Post post, Community community, User authorPost) {
+    public AuthorPostInCommunity publishPostInCommunityById(Post post, Community community, User authorPost) {
 
         if (!communityRepository.isUserInCommunity(authorPost.getId(), community.getId()) &&
         !creatorCommunityRepository.isUserCreatorCommunityById(authorPost.getId(), community.getId())) {
@@ -111,7 +111,7 @@ public class CommunityService {
 
         UserPostPrimaryKey primaryKey = new UserPostPrimaryKey(authorPost, post, community);
 
-        UserPost userPost = new UserPost(primaryKey);
+        AuthorPostInCommunity userPost = new AuthorPostInCommunity(primaryKey);
 
         return userPostRepository.create(userPost);
     }
@@ -120,7 +120,7 @@ public class CommunityService {
 
         if (creatorCommunityRepository.isUserCreatorCommunityById(user.getId(), community.getId())) {
 
-            UserPost userPost = new UserPost(new UserPostPrimaryKey(user, post, community));
+            AuthorPostInCommunity userPost = new AuthorPostInCommunity(new UserPostPrimaryKey(user, post, community));
 
             userPostRepository.delete(userPost);
         }

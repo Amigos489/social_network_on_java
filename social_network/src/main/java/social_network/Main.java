@@ -7,10 +7,6 @@ import org.hibernate.cfg.Configuration;
 import social_network.entity.*;
 import social_network.repository.*;
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-
 public class Main {
 
     public static void main(String[] args) {
@@ -27,7 +23,7 @@ public class Main {
                 .addAnnotatedClass(Community.class)
                 .addAnnotatedClass(CreatorCommunity.class)
                 .addAnnotatedClass(CreatorGroupChat.class)
-                .addAnnotatedClass(UserPost.class);
+                .addAnnotatedClass(AuthorPostInCommunity.class);
 
         SessionFactory sessionFactory = configuration.buildSessionFactory();
         Session session = sessionFactory.openSession();

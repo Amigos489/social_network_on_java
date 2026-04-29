@@ -24,7 +24,7 @@ public class Community {
 
     @OneToMany
     @JoinColumn(name = "community_id")
-    private List<UserPost> userPosts;
+    private List<AuthorPostInCommunity> userPosts;
 
     public Community() {
     }
@@ -52,7 +52,7 @@ public class Community {
         return users;
     }
 
-    public List<UserPost> getUserPosts() {
+    public List<AuthorPostInCommunity> getUserPosts() {
         return userPosts;
     }
 }
