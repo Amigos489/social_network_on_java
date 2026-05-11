@@ -1,12 +1,14 @@
 package social_network.repository;
 
 import org.hibernate.Session;
+import org.springframework.stereotype.Repository;
 import social_network.entity.Post;
 import social_network.entity.AuthorPostInCommunity;
 import social_network.primarykey.UserPostPrimaryKey;
 
 import java.util.List;
 
+@Repository
 public class UserPostRepository extends AbstractRepository<AuthorPostInCommunity, UserPostPrimaryKey> {
 
     public UserPostRepository(Session session) {

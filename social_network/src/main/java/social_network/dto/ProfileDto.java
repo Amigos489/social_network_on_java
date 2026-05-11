@@ -5,7 +5,7 @@ import social_network.entity.Post;
 import java.time.LocalDate;
 import java.util.List;
 
-public class ProfileInfoDto {
+public class ProfileDto {
 
     private String name;
 
