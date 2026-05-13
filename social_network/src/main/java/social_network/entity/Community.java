@@ -3,7 +3,9 @@ package social_network.entity;
 import jakarta.persistence.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "community")
@@ -20,20 +22,24 @@ public class Community {
     private String description;
 
     @ManyToMany(mappedBy = "communities")
-    private List<User> users;
+    private Set<User> users;
 
     @OneToMany
     @JoinColumn(name = "community_id")
-    private List<AuthorPostInCommunity> userPosts;
+    private Set<PostInCommunity> posts;
 
+    @ManyToOne
+    @JoinColumn(name = "creator_id")
+    private User creator;
     public Community() {
     }
 
-    public Community(String name, String description) {
+    public Community(String name, String description, User creator) {
         this.name = name;
         this.description = description;
-        this.users = new ArrayList<>();
-        this.userPosts = new ArrayList<>();
+        this.creator = creator;
+        this.users = new HashSet<>();
+        this.posts = new HashSet<>();
     }
 
     public Integer getId() {
@@ -48,11 +54,15 @@ public class Community {
         return description;
     }
 
-    public List<User> getUsers() {
+    public Set<User> getUsers() {
         return users;
     }
 
-    public List<AuthorPostInCommunity> getUserPosts() {
-        return userPosts;
+    public Set<PostInCommunity> getPosts() {
+        return posts;
+    }
+
+    public User getCreator() {
+        return creator;
     }
 }

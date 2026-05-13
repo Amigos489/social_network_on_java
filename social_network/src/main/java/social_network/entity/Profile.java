@@ -1,6 +1,7 @@
 package social_network.entity;
 
 import jakarta.persistence.*;
+import social_network.enums.Gender;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -17,8 +18,12 @@ public class Profile {
     @Column(name = "status", length = 100)
     private String status;
 
-    @Column(name = "birthday")
-    private LocalDate birthday;
+    @Column(name = "age")
+    private Integer age;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gender", length = 6)
+    private Gender gender;
 
     @OneToMany
     @JoinColumn(name = "profile_id")
@@ -44,12 +49,20 @@ public class Profile {
         this.status = status;
     }
 
-    public LocalDate getBirthday() {
-        return birthday;
+    public Integer getAge() {
+        return age;
     }
 
-    public void setBirthday(LocalDate birthday) {
-        this.birthday = birthday;
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public Gender getGender() {
+        return gender;
+    }
+
+    public void setGender(Gender gender) {
+        this.gender = gender;
     }
 
     public List<Post> getPosts() {

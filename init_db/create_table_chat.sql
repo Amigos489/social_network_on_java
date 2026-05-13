@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS chat
+(
+    id INTEGER NOT NULL,
+    CONSTRAINT chat_pkey PRIMARY KEY (id)
+);

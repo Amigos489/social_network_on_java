@@ -1,10 +1,14 @@
 package social_network.repository;
 
 import org.hibernate.Session;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
-public class AdminRepository{
+@Repository
+public class AdminRepository {
 
     private Session session;
+
     public AdminRepository(Session session) {
         this.session = session;
     }
@@ -13,14 +17,14 @@ public class AdminRepository{
 
         final String hql = "UPDATE User u SET u.isBlocked = true WHERE u.id = :id";
 
-        session.createQuery(hql).executeUpdate();
+        session.createQuery(hql).setParameter("id", id).executeUpdate();
     }
 
     public void unblockUserById(Integer id) {
 
         final String hql = "UPDATE User u SET u.isBlocked = false WHERE u.id = :id";
 
-        session.createQuery(hql).executeUpdate();
+        session.createQuery(hql).setParameter("id", id).executeUpdate();
     }
 
     public void deleteCommunityById(Integer id) {

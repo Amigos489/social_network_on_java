@@ -1,27 +1,35 @@
 package social_network.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "group_chat")
 public class GroupChat extends Chat {
 
     @ManyToMany(mappedBy = "chats")
-    private List<User> users;
+    private Set<User> users;
+
+    @ManyToOne
+    @JoinColumn(name = "creator_id")
+    private User creator;
 
     public GroupChat() {
     }
 
-    public GroupChat(List<User> users) {
+    public GroupChat(Set<User> users, User creator) {
         super();
         this.users = users;
+        this.creator = creator;
     }
 
-    public List<User> getUsers() {
+    public Set<User> getUsers() {
         return users;
+    }
+
+    public User getCreator() {
+        return creator;
     }
 }

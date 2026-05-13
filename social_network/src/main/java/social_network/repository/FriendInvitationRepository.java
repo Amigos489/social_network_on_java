@@ -1,5 +1,6 @@
 package social_network.repository;
 
+import org.springframework.stereotype.Repository;
 import social_network.entity.FriendInvitation;
 import social_network.entity.User;
 import social_network.enums.FriendInvitationStatus;
@@ -8,6 +9,7 @@ import social_network.primarykey.FriendInvitationPrimaryKey;
 
 import java.util.List;
 
+@Repository
 public class FriendInvitationRepository extends AbstractRepository<FriendInvitation, FriendInvitationPrimaryKey> {
 
     public FriendInvitationRepository(Session session) {
@@ -74,4 +76,17 @@ public class FriendInvitationRepository extends AbstractRepository<FriendInvitat
                 .setParameter("friendId", friendId)
                 .executeUpdate();
     }
+
+    public List<User> findFriendsByUserId(Integer userId) {
+
+        final String hql = "SELECT u FROM User u JOIN FriendInvitation f_i " +
+                "ON (u.id = f_i.primaryKey.sender.id OR u.id = f_i.primaryKey.recipient.id) " +
+                "WHERE (f_i.primaryKey.sender.id = :userId OR f_i.primaryKey.recipient.id = :userId) " +
+                "AND u.id != :userId AND f_i.friendInvitationStatus = 'ACCEPTED'";
+
+        return session.createQuery(hql, User.class)
+                .setParameter("userId", userId)
+                .list();
+    }
+
 }

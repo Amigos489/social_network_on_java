@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS profile
+DROP COLUMN IF EXISTS  birthday;

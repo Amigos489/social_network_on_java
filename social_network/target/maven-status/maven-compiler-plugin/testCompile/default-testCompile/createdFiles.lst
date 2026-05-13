@@ -1,0 +1,17 @@
+social_network\controller\MessageControllerTest.class
+social_network\service\MessageServiceTest.class
+social_network\service\AdminServiceTest.class
+social_network\controller\UserControllerTest.class
+social_network\TestData.class
+social_network\service\FriendInvitationServiceTest.class
+social_network\controller\ProfileControllerTest.class
+social_network\service\ProfileServiceTest.class
+social_network\controller\ChatControllerTest.class
+social_network\service\ServiceFacadeTest.class
+social_network\controller\FriendInvitationControllerTest.class
+social_network\service\CommunityServiceTest.class
+social_network\service\ChatServiceTest.class
+social_network\controller\CommunityControllerTest.class
+social_network\service\UserServiceTest.class
+social_network\controller\AdminControllerTest.class
+social_network\service\PostServiceTest.class

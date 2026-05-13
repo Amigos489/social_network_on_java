@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS "user"
+(
+    id SERIAL,
+    is_blocked BOOLEAN NOT NULL,
+    login CHARACTER VARYING(254) NOT NULL,
+    name CHARACTER VARYING(50) NOT NULL,
+    password CHARACTER VARYING(72) NOT NULL,
+    surname CHARACTER VARYING(50) NOT NULL,
+    role CHARACTER VARYING(5) NOT NULL,
+    CONSTRAINT user_pkey PRIMARY KEY (id),
+    CONSTRAINT user_login_key UNIQUE (login)
+);

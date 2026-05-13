@@ -1,5 +1,6 @@
 package social_network.repository;
 
+import org.springframework.stereotype.Repository;
 import social_network.entity.Chat;
 import social_network.entity.Message;
 import org.hibernate.Session;
@@ -7,6 +8,7 @@ import social_network.entity.User;
 
 import java.util.List;
 
+@Repository
 public class MessageRepository extends AbstractRepository<Message, Integer> {
 
     public MessageRepository(Session session) {

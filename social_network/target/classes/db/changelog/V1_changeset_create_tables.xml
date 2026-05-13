@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+        <changeSet id="1" author="balabol">
+            <sqlFile path="sql/create_table_chat.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_community.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_friend_invitation.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_group_chat.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_hibernate_sequences.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_message.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_personal_chat.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_post.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_post_in_community.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_profile.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_user.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_user_chat.sql" relativeToChangelogFile="true"/>
+            <sqlFile path="sql/create_table_user_community.sql" relativeToChangelogFile="true"/>
+        </changeSet>
+</databaseChangeLog>

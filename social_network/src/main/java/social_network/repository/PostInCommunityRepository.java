@@ -2,29 +2,27 @@ package social_network.repository;
 
 import org.hibernate.Session;
 import org.springframework.stereotype.Repository;
-import social_network.entity.Post;
-import social_network.entity.AuthorPostInCommunity;
-import social_network.primarykey.UserPostPrimaryKey;
+import social_network.entity.PostInCommunity;
 
 import java.util.List;
 
 @Repository
-public class UserPostRepository extends AbstractRepository<AuthorPostInCommunity, UserPostPrimaryKey> {
+public class PostInCommunityRepository extends AbstractRepository<PostInCommunity, Integer> {
 
-    public UserPostRepository(Session session) {
-        super(AuthorPostInCommunity.class, session);
+    public PostInCommunityRepository(Session session) {
+        super(PostInCommunity.class, session);
     }
 
-    public List<Post> findAllPostByCommunityId(Integer communityId) {
+    public List<PostInCommunity> findAllPostByCommunityId(Integer communityId) {
 
-        final String hql = "FROM Post p JOIN UserPost u_p ON p.id = u_p.primaryKey.post.id WHERE u_p.primaryKey.community.id = :communityId";
+        final String hql = "FROM PostInCommunity p WHERE p.community.id = :communityId";
 
-        return session.createQuery(hql, Post.class).setParameter("communityId", communityId).list();
+        return session.createQuery(hql, PostInCommunity.class).setParameter("communityId", communityId).list();
     }
 
     public void deleteAllByCommunityId(Integer communityId) {
 
-        final String hql = "DELETE UserPost u_p WHERE u_p.primaryKey.community.id = :communityId";
+        final String hql = "DELETE PostInCommunity p WHERE p.community.id = :communityId";
 
         session.createQuery(hql).setParameter("communityId", communityId).executeUpdate();
     }

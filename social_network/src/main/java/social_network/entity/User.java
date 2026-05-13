@@ -1,9 +1,10 @@
 package social_network.entity;
 
 import jakarta.persistence.*;
+import social_network.enums.Role;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "\"user\"")
@@ -13,37 +14,42 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "name", nullable = false, length = 30)
+    @Column(name = "name", nullable = false, length = 50)
     private String name;
 
-    @Column(name = "surname", nullable = false, length = 30)
+    @Column(name = "surname", nullable = false, length = 50)
     private String surname;
 
-    @Column(name = "login", unique = true , nullable = false, length = 30)
+    @Column(name = "login", unique = true , nullable = false, length = 254)
     private String login;
 
-    @Column(name = "password", nullable = false, length = 30)
+    @Column(name = "password", nullable = false, length = 72)
     private String password;
 
     @Column(name = "is_blocked", nullable = false)
     private boolean isBlocked;
 
     @ManyToMany
-    private List<Chat> chats;
+    private Set<Chat> chats;
 
     @ManyToMany
-    private List<Community> communities;
+    private Set<Community> communities;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", length = 5)
+    private Role role;
 
     public User() {
     }
 
-    public User(String name, String surname, String login, String password) {
+    public User(String name, String surname, String login, String password, Role role) {
         this.name = name;
         this.surname = surname;
         this.login = login;
         this.password = password;
-        this.chats = new ArrayList<>();
-        this.communities = new ArrayList<>();
+        this.chats = new HashSet<>();
+        this.communities = new HashSet<>();
+        this.role = role;
         this.isBlocked = false;
     }
 
@@ -67,12 +73,16 @@ public class User {
         return password;
     }
 
-    public List<Chat> getChats() {
+    public Set<Chat> getChats() {
         return chats;
     }
 
-    public List<Community> getCommunities() {
+    public Set<Community> getCommunities() {
         return communities;
+    }
+
+    public Role getRole() {
+        return role;
     }
 
     public boolean isBlocked() {

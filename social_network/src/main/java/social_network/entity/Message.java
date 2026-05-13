@@ -14,7 +14,7 @@ public class Message {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(nullable = false, length = 150)
+    @Column(name = "text", nullable = false, length = 150)
     private String text;
 
     @Column(nullable = false, name = "date_time_sending")

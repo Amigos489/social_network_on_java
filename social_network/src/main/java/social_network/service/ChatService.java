@@ -1,58 +1,96 @@
-package social_network.Service;
+package social_network.service;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Service;
+import social_network.dto.GroupChatDto;
 import social_network.entity.*;
-import social_network.exception.GroupChatNotFoundException;
-import social_network.exception.community.ErrorAddingException;
-import social_network.exception.community.ErrorDeletingException;
-import social_network.primarykey.CreatorGroupChatPrimaryKey;
-import social_network.repository.CreatorGroupChatRepository;
+import social_network.exception.ChatException;
+import social_network.exception.NotFoundException;
+import social_network.mapper.GroupChatMapper;
 import social_network.repository.GroupChatRepository;
 import social_network.repository.PersonalChatRepository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
+@Service
 public class ChatService {
+
+    private final GroupChatMapper groupChatMapper;
+
+    private static Logger logger = LogManager.getLogger(ChatService.class);
+
+    private final String MESSAGE_GROUP_CHAT_NOT_FOUND = "group chat with id = %d not found.";
+
+    private final String MESSAGE_PERSONAL_CHAT_NOT_FOUND = "personal chat between users with id = %d and id = %d not found.";
+
+    private final String MESSAGE_USER_NOT_CREATOR_GROUP_CHAT = "user with id = %d not creator group chat with id = %d.";
+
+    private final String MESSAGE_USER_CREATOR_GROUP_CHAT = "user with id = %d creator group chat with id = %d.";
+
+    private final String MESSAGE_USER_ALREADY_GROUP_CHAT = "User with id = %d is already in a group chat with id = %d.";
+
+    private final String MESSAGE_USER_NOT_GROUP_CHAT = "user with id = %d is not in a group chat with id = %d.";
+
+    private final String MESSAGE_USERS_EMPTY = "list users for add empty.";
 
     private final PersonalChatRepository personalChatRepository;
 
     private final GroupChatRepository groupChatRepository;
 
-    private final CreatorGroupChatRepository creatorGroupChatRepository;
-
-    public ChatService(PersonalChatRepository personalChatRepository, GroupChatRepository groupChatRepository, CreatorGroupChatRepository creatorGroupChatRepository) {
+    public ChatService(GroupChatMapper groupChatMapper, PersonalChatRepository personalChatRepository, GroupChatRepository groupChatRepository) {
+        this.groupChatMapper = groupChatMapper;
         this.personalChatRepository = personalChatRepository;
         this.groupChatRepository = groupChatRepository;
-        this.creatorGroupChatRepository = creatorGroupChatRepository;
     }
 
-    public GroupChat createGroupChat(List<User> users, User creator) {
+    public GroupChatDto createGroupChat(Set<User> users, User creator) {
 
-        users.add(creator);
+        logger.info("creating a group chat, creator id = {}.", creator.getId());
 
-        GroupChat groupChat = groupChatRepository.create(new GroupChat(users));
+        if (!users.stream().anyMatch(item -> creator.getId().equals(item.getId()))) {
+
+            logger.info("the creator with id = {} is not listed for adding to the group chat.", creator.getId());
+
+            users.add(creator);
+        }
+
+        if (users.size() <= 1) {
+
+            logger.error((MESSAGE_USERS_EMPTY));
+
+            throw new ChatException(MESSAGE_USERS_EMPTY);
+        }
+
+        GroupChat groupChat = groupChatRepository.create(new GroupChat(users, creator));
 
         for (User user : users) {
             user.getChats().add(groupChat);
         }
 
-        CreatorGroupChat creatorGroupChat = new CreatorGroupChat(new CreatorGroupChatPrimaryKey(creator, groupChat));
+        logger.info("group chat with id = {}, adding users = {}, creator id = {} created.", groupChat.getId(), users.toString(), creator.getId());
 
-        creatorGroupChat = creatorGroupChatRepository.create(creatorGroupChat);
-
-        return groupChat;
+        return groupChatMapper.doGroupChatDto(groupChat);
     }
 
     public void deleteGroupChatById(Integer groupChatId, User userWhoDeletes) {
 
-        GroupChat groupChat = groupChatRepository.findById(groupChatId);
+        logger.info(String.format("delete group chat with id = %d, user id who delete = {}.",
+                groupChatId,
+                userWhoDeletes));
 
-        if (!creatorGroupChatRepository.isUserCreatorGroupChatById(userWhoDeletes.getId(), groupChatId)) {
-            throw new ErrorDeletingException(String.format("User with id = %d cannot delete a group chat with id = %d", userWhoDeletes.getId(), groupChatId));
-        }
+        GroupChat groupChat = findGroupChatById(groupChatId);
 
-        if (groupChat == null) {
-            throw new GroupChatNotFoundException(groupChatId);
+        if (!groupChatRepository.isUserCreatorGroupChatById(userWhoDeletes.getId(),
+                groupChatId)) {
+
+            logger.error(String.format(MESSAGE_USER_NOT_CREATOR_GROUP_CHAT, userWhoDeletes.getId(), groupChatId));
+
+            throw new ChatException(String.format(MESSAGE_USER_NOT_CREATOR_GROUP_CHAT,
+                    userWhoDeletes.getId(),
+                    groupChatId));
         }
 
         for (User user : groupChat.getUsers()) {
@@ -60,87 +98,166 @@ public class ChatService {
             user.getChats().remove(groupChat);
         }
 
-        CreatorGroupChat creatorGroupChat = creatorGroupChatRepository.findById(new CreatorGroupChatPrimaryKey(userWhoDeletes, groupChat));
-
-        creatorGroupChatRepository.delete(creatorGroupChat);
+        logger.info(String.format("group chat with id = %d deleted, user id who delete = {}.",
+                groupChatId,
+                userWhoDeletes));
 
         groupChatRepository.delete(groupChat);
     }
 
-    public List<User> addUserInGroupChatById(User userForAdd, Integer groupChatId, User userWhoAdds) {
+    public void addUserInGroupChatById(User userForAdd,
+                                       Integer chatId,
+                                       User userWhoAdds) {
 
-        if (groupChatRepository.isUserInChatById(groupChatId, userForAdd.getId())) {
+        logger.info("add user with id = {} in group chat with id = {}. user id who add = {}.",
+                userForAdd.getId(),
+                chatId,
+                userWhoAdds.getId());
 
-            throw new ErrorAddingException(String.format("User with id = %d is already in a chat with id = %d", userWhoAdds.getId(), groupChatId));
+        GroupChat groupChat = findGroupChatById(chatId);
+
+        if (groupChatRepository.isUserInChatById(chatId, userForAdd.getId())) {
+
+            logger.error(String.format(MESSAGE_USER_ALREADY_GROUP_CHAT,
+                    userWhoAdds.getId(),
+                    chatId));
+
+            throw new ChatException(String.format(MESSAGE_USER_ALREADY_GROUP_CHAT,
+                    userWhoAdds.getId(),
+                    chatId));
         }
-
-        GroupChat groupChat = groupChatRepository.findById(groupChatId);
 
         groupChat.getUsers().add(userForAdd);
 
         userForAdd.getChats().add(groupChat);
 
-        return groupChat.getUsers();
+        logger.info("user with id = {} added in group chat with id = {}. user id who add = {}.",
+                userForAdd.getId(),
+                chatId,
+                userWhoAdds.getId());
     }
 
-    public List<User> kickUserFromGroupChatById(User userForDelete, Integer groupChatId, User userWhoDeletes) {
+    public void kickUserFromGroupChatById(User userForKick,
+                                          Integer groupChatId,
+                                          User userWhoKick) {
 
-        //Проверка, что пользователь, который удаляет создатель чата.
-        if (!creatorGroupChatRepository.isUserCreatorGroupChatById(userWhoDeletes.getId(), groupChatId)) {
+        logger.info("kick user with id {} from group chat with id = {}, user id who kicked = {}.",
+                userForKick.getId(),
+                groupChatId,
+                userWhoKick.getId());
 
-            throw new ErrorDeletingException(String.format("User with id = %d cannot kick user from group chat with id = %d", userWhoDeletes.getId(), groupChatId));
+        GroupChat groupChat = findGroupChatById(groupChatId);
+
+        if (!groupChatRepository.isUserCreatorGroupChatById(userWhoKick.getId(),
+                groupChatId)) {
+
+            logger.error(String.format(MESSAGE_USER_NOT_CREATOR_GROUP_CHAT,
+                    userWhoKick.getId(),
+                    groupChatId));
+
+            throw new ChatException(String.format(MESSAGE_USER_NOT_CREATOR_GROUP_CHAT,
+                    userWhoKick.getId(),
+                    groupChatId));
         }
 
-        //Проверка, что пользователь, которого удаляют находится в чате.
-        if (groupChatRepository.isUserInChatById(groupChatId, userForDelete.getId())) {
+        if (!groupChatRepository.isUserInChatById(groupChatId,
+                userForKick.getId())) {
 
-            throw new ErrorDeletingException(String.format(String.format("User with id = %d not in the chat with id = %d", userForDelete.getId(), groupChatId), userWhoDeletes.getId(), groupChatId));
+            logger.error(String.format(MESSAGE_USER_NOT_GROUP_CHAT,
+                    userForKick.getId(),
+                    groupChatId));
+
+            throw new ChatException(String.format(MESSAGE_USER_NOT_GROUP_CHAT,
+                    userForKick.getId(),
+                    groupChatId));
         }
 
-        GroupChat groupChat = groupChatRepository.findById(groupChatId);
+        groupChat.getUsers().remove(userForKick);
 
-        groupChat.getUsers().remove(userForDelete);
+        userForKick.getChats().remove(groupChat);
 
-        userForDelete.getChats().remove(groupChat);
-
-        return groupChat.getUsers();
+        logger.info("user with id {} kicked from group chat with id = {}, user id who kicked = {}.",
+                userForKick.getId(),
+                groupChatId,
+                userWhoKick.getId());
     }
 
-    public List<User> leaveFromGroupChat(Integer groupChatId, User user) {
+    public void leaveFromGroupChat(Integer groupChatId,
+                                   User user) {
 
-        //Проверка, что пользователь, который удаляет создатель чата.
-        if (creatorGroupChatRepository.isUserCreatorGroupChatById(user.getId(), groupChatId)) {
+        logger.info("user with id = {} leave from group chat with id = {}.",
+                user.getId(),
+                groupChatId);
 
-            throw new ErrorDeletingException(String.format("User with id = %d cannot leave from group chat with id = %d", user.getId(), groupChatId));
+        GroupChat groupChat = findGroupChatById(groupChatId);
+
+        if (groupChatRepository.isUserCreatorGroupChatById(user.getId(),
+                groupChatId)) {
+
+            logger.error(String.format(MESSAGE_USER_CREATOR_GROUP_CHAT,
+                    user.getId(),
+                    groupChatId));
+
+            throw new ChatException(String.format(MESSAGE_USER_CREATOR_GROUP_CHAT,
+                    user.getId(),
+                    groupChatId));
         }
 
-        if (!groupChatRepository.isUserInChatById(groupChatId, user.getId())) {
+        if (!groupChatRepository.isUserInChatById(groupChatId,
+                user.getId())) {
 
-            throw new ErrorDeletingException(String.format("user with id = %d is not in a chat with id = %d", user.getId(), groupChatId));
+            logger.error(String.format(MESSAGE_USER_NOT_GROUP_CHAT,
+                    user.getId(),
+                    groupChatId));
+
+            throw new ChatException(String.format(MESSAGE_USER_NOT_GROUP_CHAT,
+                    user.getId(),
+                    groupChatId));
         }
-
-        GroupChat groupChat = groupChatRepository.findById(groupChatId);
 
         groupChat.getUsers().remove(user);
 
         user.getChats().remove(groupChat);
 
-        return groupChat.getUsers();
+        logger.info("user with id = {} leaved from group chat with id = {}.",
+                user.getId(),
+                groupChatId);
     }
 
-    public List<Message> getAllMessageFromGroupChatById(GroupChat chat, User user) {
+    public List<Message> getAllMessageFromGroupChatById(GroupChat chat,
+                                                        User user) {
 
-        if (groupChatRepository.isUserInChatById(chat.getId(), user.getId())) {
+        logger.info("get all messages from group chat with id = {}, user id = {}",
+                chat.getId(),
+                user.getId());
 
-            throw new ErrorDeletingException(String.format("User with id = %d not in the chat with id = %d", user.getId(), chat.getId()));
+        if (!groupChatRepository.isUserInChatById(chat.getId(), user.getId())) {
+
+            logger.error(String.format(MESSAGE_USER_NOT_GROUP_CHAT,
+                    user.getId(),
+                    chat.getId()));
+
+            throw new ChatException(String.format(MESSAGE_USER_NOT_GROUP_CHAT,
+                    user.getId(),
+                    chat.getId()));
         }
+
+        logger.info("all messages from group chat with id = {}, user id = {}",
+                chat.getId(),
+                user.getId());
 
         return groupChatRepository.getAllMessagesById(chat.getId());
     }
 
-    public PersonalChat createPersonalChat(User firstUser, User secondUser) {
+    public PersonalChat createPersonalChat(User firstUser,
+                                           User secondUser) {
 
-        PersonalChat personalChat = new PersonalChat(firstUser, secondUser);
+        logger.info("create personal chat for user with id = {} and {}",
+                firstUser.getId(),
+                secondUser.getId());
+
+        PersonalChat personalChat = new PersonalChat(firstUser,
+                secondUser);
 
         firstUser.getChats().add(personalChat);
 
@@ -149,16 +266,38 @@ public class ChatService {
         return personalChatRepository.create(personalChat);
     }
 
-    public PersonalChat findPersonalChatByUserIds(User firstUser, User secondUser) {
+    public PersonalChat findPersonalChatByUserIds(User firstUser,
+                                                  User secondUser) {
 
-        return personalChatRepository.findByUserIds(firstUser.getId(), secondUser.getId());
+        logger.info("find personal chat by user ids = {} and {}.",
+                firstUser.getId(),
+                secondUser.getId());
+
+        PersonalChat personalChat = personalChatRepository.findByUserIds(firstUser.getId(),
+                secondUser.getId());
+
+        if (personalChat == null) {
+
+            throw new ChatException(String.format(MESSAGE_PERSONAL_CHAT_NOT_FOUND,
+                    firstUser.getId(),
+                    secondUser.getId()));
+        }
+
+        return personalChat;
     }
 
     public List<Message> getAllMessageFromPersonalChat(User firstUser, User secondUser) {
 
+        logger.info("get all messages from personal chat between users with id = {} and {}.",
+                firstUser.getId(),
+                secondUser.getId());
+
         PersonalChat personalChat = personalChatRepository.findByUserIds(firstUser.getId(), secondUser.getId());
 
         if (personalChat == null) {
+
+            logger.warn("between users with ids = {} and {} not personal chat, so not message.");
+
             return new ArrayList<>();
         }
 
@@ -167,16 +306,41 @@ public class ChatService {
 
     public GroupChat findGroupChatById(Integer chatId) {
 
+        logger.info(String.format("find group chat by id = %d", chatId));
+
         GroupChat groupChat = groupChatRepository.findById(chatId);
 
         if (groupChat == null) {
-            throw new GroupChatNotFoundException(chatId);
+
+            logger.error(String.format(MESSAGE_GROUP_CHAT_NOT_FOUND, chatId));
+
+            throw new NotFoundException(String.format(MESSAGE_GROUP_CHAT_NOT_FOUND, chatId));
         }
 
         return groupChat;
     }
 
+    public void sendMessageInGroupChat(GroupChat groupChat, Message message) {
+
+        logger.info("send message in group chat with id = {} user id = {}",
+                groupChat.getId(),
+                message.getSender().getId());
+
+        if (!checkUserInChatById(groupChat.getId(), message.getSender().getId())) {
+            throw new ChatException(String.format(MESSAGE_USER_NOT_GROUP_CHAT,
+                    message.getSender().getId(),
+                    groupChat.getId()));
+        }
+
+        groupChat.getMessages().add(message);
+    }
+
     public boolean checkUserInChatById(Integer chatId, Integer userId) {
+
+        logger.info("check user with id = {} in chat with id = {}.",
+                userId,
+                chatId);
+
         return groupChatRepository.isUserInChatById(chatId, userId);
     }
 }

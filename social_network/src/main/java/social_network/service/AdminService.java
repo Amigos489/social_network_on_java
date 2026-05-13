@@ -1,7 +1,11 @@
-package social_network.Service;
+package social_network.service;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import social_network.repository.AdminRepository;
 
+@Service
+@Transactional
 public class AdminService {
 
     private AdminRepository adminRepository;

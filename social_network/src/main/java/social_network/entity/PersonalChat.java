@@ -1,9 +1,6 @@
 package social_network.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.util.List;
 
@@ -12,9 +9,11 @@ import java.util.List;
 public class PersonalChat extends Chat {
 
     @ManyToOne
+    @JoinColumn(name = "first_user_id")
     private User firstUser;
 
     @ManyToOne
+    @JoinColumn(name = "second_user_id")
     private User secondUser;
 
     public PersonalChat() {

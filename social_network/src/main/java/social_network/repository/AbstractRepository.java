@@ -1,6 +1,7 @@
 package social_network.repository;
 
 import org.hibernate.Session;
+import org.hibernate.SessionFactory;
 
 import java.io.Serializable;
 

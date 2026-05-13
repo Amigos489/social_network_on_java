@@ -1,26 +1,36 @@
-package social_network.Service;
+package social_network.service;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import social_network.dto.*;
+import social_network.dto.CommunityInfoDto;
 import social_network.entity.*;
+import social_network.enums.Gender;
 import social_network.exception.*;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
+@Service
 public class ServiceFacade {
 
-    private UserService userService;
+    private static Logger logger = LogManager.getLogger(ServiceFacade.class);
 
-    private ProfileService profileService;
+    private final UserService userService;
 
-    private MessageService messageService;
+    private final ProfileService profileService;
 
-    private ChatService chatService;
+    private final MessageService messageService;
 
-    private PostService postService;
+    private final ChatService chatService;
 
-    private FriendInvitationService friendInvitationService;
+    private final PostService postService;
 
-    private CommunityService communityService;
+    private final FriendInvitationService friendInvitationService;
+
+    private final CommunityService communityService;
 
     public ServiceFacade(UserService userService, ProfileService profileService,
                          MessageService messageService, ChatService chatService,
@@ -35,30 +45,28 @@ public class ServiceFacade {
         this.communityService = communityService;
     }
 
-    public void registerUser(String name, String surname,
-                             String login, String password) {
+    @Transactional
+    public void registerUser(UserRegisterDto userRegisterDto) {
 
-        try {
+        logger.info("start user registration.");
 
-            // Проверка, что логин не занят другим пользователем.
+        userService.checkingIfEmailOccupied(userRegisterDto.login());
 
-            User user = userService.findUserByLogin(login);
+        User user = userService.createUser(userRegisterDto.name(), userRegisterDto.surname(), userRegisterDto.login(), userRegisterDto.password());
 
-            throw new ErrorRegistrationException("This login is already being used by another user.");
+        Profile profile = profileService.createProfile(user);
 
-        } catch (UserNotFoundException e) {
-
-            User user = userService.createUser(name, surname, login, password);
-
-            Profile profile = profileService.createProfile(user);
-        }
+        logger.info("the user is registered");
     }
 
-    public void sendMessageToUser(Integer senderId, Integer recipientId, String text) {
+    @Transactional
+    public void sendMessageToUser(MessageToUserDto messageToUserDto, Integer userId) {
 
-        User sender = userService.findUserById(senderId);
+        logger.info(String.format("send message to user with id = %d from user with id = %d.", messageToUserDto.recipientId(), userId));
 
-        User recipient = userService.findUserById(recipientId);
+        User sender = userService.findUserById(userId);
+
+        User recipient = userService.findUserById(messageToUserDto.recipientId());
 
         PersonalChat personalChat = chatService.findPersonalChatByUserIds(sender, recipient);
 
@@ -67,33 +75,38 @@ public class ServiceFacade {
             personalChat = chatService.createPersonalChat(sender, recipient);
         }
 
-        Message message = messageService.createMessage(text, sender, personalChat);
+        Message message = messageService.createMessage(messageToUserDto.text(),
+                sender,
+                personalChat);
 
         personalChat.getMessages().add(message);
+
+        logger.info(String.format("a message has been sent to the user with id = %d from the user with id = %d.",
+                messageToUserDto.recipientId(),
+                userId));
     }
 
+    @Transactional
     public void sendFriendInvitation(Integer senderId, Integer recipientId) {
+
+        logger.info(String.format("send friend invitation to user with id = %d from user with id = %d.", senderId, recipientId));
 
         User sender = userService.findUserById(senderId);
 
         User recipient = userService.findUserById(recipientId);
 
-        //Нельзя отправить приглашение в друзья самому себе
-
         if (senderId.equals(recipientId)) {
-            return;
+            logger.error("You can't send an friend invitation to yourself.");
+            throw new FriendInvitationException(String.format("You can't send an friend invitation to yourself."));
         }
-
-        //Проверка, что пользователи уже друзья
 
         if (friendInvitationService.checkIfUsersFriendsById(senderId, recipientId)) {
 
+            logger.error(String.format("Users with id = %d and id = %d are already friends.", senderId, recipientId));
             throw new FriendInvitationException(String.format("Users with id = %d and id = %d are already friends.", senderId, recipientId));
         }
 
-        //Проверка, что приглашение в друзья уже отправлено
-
-        if (friendInvitationService.findActiveFriendInvitationByUserIds(senderId, recipientId) != null) {
+        if (friendInvitationService.checkActiveFriendInvitationByUserIds(senderId, recipientId)) {
 
             throw new FriendInvitationException("The friend invitation has already been sent.");
         }
@@ -101,14 +114,14 @@ public class ServiceFacade {
         FriendInvitation friendInvitation = friendInvitationService.createFriendInvitation(sender, recipient);
     }
 
+    @Transactional
     public void acceptFriendInvitation(Integer senderId, Integer recipientId, Integer userId) {
 
-        if (!userId.equals(senderId) && !userId.equals(recipientId)) {
-            return;
-        }
+        logger.info("accept a friend invitation user c id = {} from user with id = {}", recipientId, senderId);
 
-        if (senderId.equals(userId)) {
-            throw new FriendInvitationException("The sender cannot accept the friend invitation.");
+        if (!userId.equals(recipientId)) {
+            logger.error("the user with id = {} is not the recipient of the friend invitation.", userId);
+            throw new FriendInvitationException(String.format("the user with id = %d is not the recipient of the friend invitation.", userId));
         }
 
         User sender = userService.findUserById(senderId);
@@ -116,16 +129,21 @@ public class ServiceFacade {
         User recipient = userService.findUserById(recipientId);
 
         friendInvitationService.acceptFriendInvitationById(sender, recipient);
+        logger.info("user with id = {} has accepted a friend request from User with id = {}.", recipientId, senderId);
     }
 
+    @Transactional
     public void declineFriendInvitation(Integer senderId, Integer recipientId, Integer userId) {
 
+        logger.info("decline a friend invitation user c id = {} from user with id = {}", recipientId, senderId);
+
         if (!userId.equals(senderId) && !userId.equals(recipientId)) {
-            return;
+            logger.error("the user with id = {} is not the recipient or sender of the friend invitation.", userId);
+            throw new FriendInvitationException(String.format("the user with id = %d is not the recipient or sender of the friend invitation.", userId));
         }
 
         if (friendInvitationService.checkIfUsersFriendsById(senderId, recipientId)) {
-
+            logger.error("the user with id = {} is not the recipient or sender of the friend invitation.", userId);
             throw new FriendInvitationException(String.format("Users with id = %d and id = %d are already friends.", senderId, recipientId));
         }
 
@@ -134,57 +152,74 @@ public class ServiceFacade {
         User recipient = userService.findUserById(recipientId);
 
         friendInvitationService.declineFriendInvitationById(sender, recipient);
+
+        logger.info(String.format("user with id = %d has declined a friend request from User with id = %d.", recipientId, senderId));
     }
 
-    public List<FriendInvitation> findSentFriendInvitation(Integer senderId) {
+    @Transactional(readOnly = true)
+    public List<ReceivedFriendInvitationDto> findSentFriendInvitation(Integer senderId) {
+
+        logger.info("find sent friend invitation");
 
         User sender = userService.findUserById(senderId);
 
         return friendInvitationService.findSentFriendInvitationByUser(sender);
     }
 
-    public List<FriendInvitation> findReceivedFriendInvitation(Integer recipientId) {
+    @Transactional(readOnly = true)
+    public List<SentFriendInvitationDto> findReceivedFriendInvitation(Integer recipientId) {
+
+        logger.info("find received friend invitation");
 
         User recipient = userService.findUserById(recipientId);
 
         return friendInvitationService.findReceivedFriendInvitationByUser(recipient);
     }
 
-    public void deleteUserFromFriend(Integer userId, Integer friendId, Integer userIdWhoDeletes) {
+    @Transactional
+    public void deleteUserFromFriend(Integer userId, Integer friendId) {
 
-        if (!userIdWhoDeletes.equals(userId) && !userIdWhoDeletes.equals(friendId)) {
-            return;
-        }
+        logger.info(String.format("delete user with id = %d from friend with id = %d", userId, friendId));
 
         User user = userService.findUserById(userId);
 
         User friend = userService.findUserById(friendId);
 
         if (!friendInvitationService.checkIfUsersFriendsById(userId, friendId)) {
-
+            logger.error(String.format("Users with id = %d and id = %d are not friends.", userId, friendId));
             throw new FriendInvitationException(String.format("Users with id = %d and id = %d are not friends.", userId, friendId));
         }
 
         friendInvitationService.deleteUserFromFriendByUser(user, friend);
+
+        logger.info(String.format("user with id = %d from friend with id = %d deleted.", userId, friendId));
     }
 
+    @Transactional
     public void publishPostInProfile(String content, Integer profileId) {
+
+        logger.info(String.format("publish post in profile with id = %d.", profileId));
 
         Profile profile = profileService.findProfileById(profileId);
 
         User user = profile.getUser();
 
         if (user.isBlocked()) {
-
+            logger.error("The user is blocked and cannot publish posts in profile.");
             throw new UserBlockedException("The user is blocked and cannot publish posts in profile.");
         }
 
         Post post = postService.createPost(content);
 
         profileService.addPostInProfile(profileId, post);
+
+        logger.info(String.format("post in profile with id = %d published.", profileId));
     }
 
+    @Transactional
     public void deletePostFromProfile(Integer postId, Integer profileId) {
+
+        logger.info(String.format("delete post from profile with id = %d", profileId));
 
         Profile profile = profileService.findProfileById(profileId);
 
@@ -193,44 +228,60 @@ public class ServiceFacade {
         profileService.deletePostFromProfileById(profileId, post);
 
         postService.deletePostById(postId);
+
+        logger.info(String.format("post from profile with id = %d deleted.", profileId));
     }
 
-    public void specifyBirthdayInProfile(Integer profileId, LocalDate birthday) {
-
-        Profile profile = profileService.findProfileById(profileId);
-
-        profileService.setBirthdayProfile(profile, birthday);
-    }
-
+    @Transactional
     public void specifyStatusInProfile(Integer profileId, String status) {
+
+        logger.info(String.format("specify status in profile with id = %d.", profileId));
 
         Profile profile = profileService.findProfileById(profileId);
 
         profileService.setStatusProfile(profile, status);
     }
 
-    public void createGroupChat(List<Integer> userIdsForAdd, Integer creatorId) {
+    @Transactional
+    public GroupChatDto createGroupChat(CreateGroupChatDto createGroupChatDto) {
 
-        User creator = userService.findUserById(creatorId);
+        logger.info("creating a group chat. users to add {}. creator id = {}", createGroupChatDto.userIds().toString(), createGroupChatDto.creatorId());
 
-        List<User> users = userService.findUsersByIds(userIdsForAdd);
+        User creator = userService.findUserById(createGroupChatDto.creatorId());
 
-        chatService.createGroupChat(users, creator);
+        Set<User> users = userService.findUsersByIds(createGroupChatDto.userIds());
+
+        GroupChatDto groupChatDto = chatService.createGroupChat(users, creator);
+
+        logger.info("group chat with id = {}. creator id = {} created.",
+                groupChatDto.id(),
+                groupChatDto.creator().id());
+
+        return groupChatDto;
     }
 
+    @Transactional
     public void deleteGroupChat(Integer chatId, Integer creatorId) {
 
+        logger.info(String.format("delete group chat with id = %d.", chatId));
+
         User creator = userService.findUserById(creatorId);
 
-        messageService.deleteAllMessageFromGroupChat(chatId);
+        messageService.deleteAllMessageFromChat(chatId);
 
         chatService.deleteGroupChatById(chatId, creator);
+
+        logger.info(String.format("group chat with id = %d deleted.", chatId));
     }
 
+    @Transactional
     public void addUserInGroupChat(Integer userIdForAdd, Integer groupChatId, Integer userIdWhoAdds) {
 
+        logger.info(String.format("add user with id = %d in group chat with id = %d", userIdForAdd, groupChatId));
+
         if (userIdForAdd.equals(userIdWhoAdds)) {
-            return;
+            logger.error("The user cannot add himself.");
+            throw new ChatException("The user cannot add himself.");
         }
 
         User userForAdd = userService.findUserById(userIdForAdd);
@@ -238,21 +289,32 @@ public class ServiceFacade {
         User userWhoAdds = userService.findUserById(userIdWhoAdds);
 
         chatService.addUserInGroupChatById(userForAdd, groupChatId, userWhoAdds);
+
+        logger.info(String.format("user with id = %d added in group chat with id = %d", userIdForAdd, groupChatId));
     }
 
+    @Transactional
     public void leaveFromGroupChat(Integer groupChatId, Integer userId) {
+
+        logger.info(String.format("user with id = %d leave from group chat with id = %d.", userId, groupChatId));
 
         User user = userService.findUserById(userId);
 
         GroupChat groupChat = chatService.findGroupChatById(groupChatId);
 
         chatService.leaveFromGroupChat(groupChatId, user);
+
+        logger.info(String.format("user with id = %d left the group chat with id = %d.", userId, groupChat));
     }
 
+    @Transactional
     public void kickUserFromGroupChat(Integer userIdForDelete, Integer groupChatId, Integer userIdWhoDeletes) {
 
+        logger.info(String.format("kick user with id = %d from group chat with id = %d", userIdForDelete, groupChatId));
+
         if (userIdForDelete.equals(userIdWhoDeletes)) {
-            return;
+            logger.error(String.format("the user with id = %d is kicked out of group chat with id = %d.", userIdForDelete, groupChatId));
+            throw new ChatException(String.format("the user with id = %d is kicked out of group chat with id = %d.", userIdForDelete, groupChatId));
         }
 
         User userForDelete = userService.findUserById(userIdForDelete);
@@ -260,25 +322,32 @@ public class ServiceFacade {
         User userWhoDeletes = userService.findUserById(userIdWhoDeletes);
 
         chatService.kickUserFromGroupChatById(userForDelete, groupChatId, userWhoDeletes);
+
+        logger.info(String.format("the user with id = %d is kicked out of group chat with id = %d.", userIdForDelete, groupChatId));
     }
 
-    public void sendMessageInGroupChat(String text, Integer senderId, Integer chatId) {
+    @Transactional
+    public void sendMessageInGroupChat(MessageToGroupChatDto messageToGroupChatDto, Integer userId) {
 
-        User sender = userService.findUserById(senderId);
+        Integer chatId = messageToGroupChatDto.chatId();
 
-        if (!chatService.checkUserInChatById(chatId, senderId)) {
+        String text = messageToGroupChatDto.text();
 
-            throw new UserIsNotInChatException(senderId);
-        }
+        logger.info(String.format("send message in group chat with id = %d from user with id = %d", chatId, userId));
+
+        User sender = userService.findUserById(userId);
 
         GroupChat groupChat = chatService.findGroupChatById(chatId);
 
         Message message = messageService.createMessage(text, sender, groupChat);
 
-        groupChat.getMessages().add(message);
+        chatService.sendMessageInGroupChat(groupChat, message);
     }
 
-    public List<Message> readAllMessagesFromGroupChat(Integer chatId, Integer userId) {
+    @Transactional
+    public List<MessageDto> readAllMessagesFromGroupChat(Integer chatId, Integer userId) {
+
+        logger.info(String.format("read all messages from group chat with id = %d", chatId));
 
         User user = userService.findUserById(userId);
 
@@ -286,12 +355,13 @@ public class ServiceFacade {
 
         List<Message> messages = chatService.getAllMessageFromGroupChatById(groupChat, user);
 
-        messageService.markMessageReadInChatById(groupChat, user);
-
-        return messages;
+        return messageService.markMessageReadInChatById(groupChat, user);
     }
 
-    public List<Message> readAllMessagesFromPersonalChat(Integer firstUserId, Integer secondUserId) {
+    @Transactional
+    public List<MessageDto> readAllMessagesFromPersonalChat(Integer firstUserId, Integer secondUserId) {
+
+        logger.info(String.format("read all messages from a personal chat between users with id = %d and %d", firstUserId, secondUserId));
 
         User firstUser = userService.findUserById(firstUserId);
 
@@ -301,74 +371,98 @@ public class ServiceFacade {
 
         List<Message> messages = chatService.getAllMessageFromPersonalChat(firstUser, secondUser);
 
-        messageService.markMessageReadInChatById(chat, firstUser);
-
-        return messages;
+        return messageService.markMessageReadInChatById(chat, firstUser);
     }
 
-    public void createCommunity(String name, String description, Integer creatorId) {
+    @Transactional
+    public CommunityInfoDto createCommunity(CommunityInfoDto communityInfoDto, Integer userId) {
 
-        User creator = userService.findUserById(creatorId);
+        logger.info("create community");
+
+        User creator = userService.findUserById(userId);
 
         if (creator.isBlocked()) {
+            logger.error("The user is blocked and cannot create communities.");
             throw new UserBlockedException("The user is blocked and cannot create communities.");
         }
 
-        Community community = communityService.createCommunity(name, description, creator);
+       return communityService.createCommunity(communityInfoDto.name(), communityInfoDto.description(), creator);
     }
 
+    @Transactional
     public void deleteCommunity(Integer communityId, Integer userId) {
 
+        logger.info(String.format("delete community with id = %d.", userId, communityId));
+
         User user = userService.findUserById(userId);
 
         Community community = communityService.findCommunityById(communityId);
 
-        communityService.deleteCommunityById(community, user);
+        communityService.deleteCommunity(community, user);
+
+        logger.info(String.format("community with id = %d deleted.", userId, communityId));
     }
 
+    @Transactional
     public void joinCommunity(Integer communityId, Integer userId) {
 
+        logger.info(String.format("user with id = %d join from community with id = %d.", userId, communityId));
+
         User user = userService.findUserById(userId);
 
         Community community = communityService.findCommunityById(communityId);
 
-        communityService.joinCommunityById(user, community);
+        communityService.userJoiningCommunity(user, community);
+
+        logger.info(String.format("user with id = %d joined from community with id = %d.", userId, communityId));
     }
 
+    @Transactional
     public void leaveCommunity(Integer communityId, Integer userId) {
 
+        logger.info(String.format("user with id = %d leave from community with id = %d.", userId, communityId));
+
         User user = userService.findUserById(userId);
 
         Community community = communityService.findCommunityById(communityId);
 
-        communityService.leaveCommunityById(user, community);
+        communityService.userLeavingCommunity(user, community);
+
+        logger.info(String.format("user with id = %d left the community with id = %d.", userId, communityId));
     }
 
-    public void publishPostCommunity(String content, Integer communityId, Integer authorPostId) {
+    @Transactional
+    public PostInCommunityDto publishPostInCommunity(CreatePostInCommunityDto createPostInCommunityDto, Integer userId) {
 
-        Community community = communityService.findCommunityById(communityId);
+        logger.info(String.format("publish post in community with id = %d.", createPostInCommunityDto.communityId()));
 
-        User authorPost = userService.findUserById(authorPostId);
+        Community community = communityService.findCommunityById(createPostInCommunityDto.communityId());
 
-        Post post = postService.createPost(content);
+        User authorPost = userService.findUserById(userId);
 
-        communityService.publishPostInCommunityById(post, community, authorPost);
+        logger.info(String.format("post in community with id = %d published.", createPostInCommunityDto.communityId()));
+
+        return communityService.publishPostInCommunityById(createPostInCommunityDto.content(), community, authorPost);
     }
 
+    @Transactional
     public void deletePostinCommunity(Integer postId, Integer communityId, Integer userId) {
 
-        Post post = postService.findPostById(postId);
+        logger.info(String.format("delete post in community with id = %d.", communityId));
 
         Community community = communityService.findCommunityById(communityId);
 
         User user = userService.findUserById(userId);
 
-        communityService.deletePostFromCommunity(post, community, user);
+        communityService.deletePostFromCommunity(postId, community, user);
 
-        postService.deletePostById(postId);
+        logger.info(String.format("post in community with id = %d deleted.", communityId));
     }
 
+    @Transactional
     public void kickUserFromCommunity(Integer userIdForDelete, Integer communityId, Integer userIdWhoDeletes) {
+
+        logger.info(String.format("kick user with id = %d from community with id = %d. id user who deletes = %d", userIdForDelete, communityId ,userIdWhoDeletes));
 
         User userForDelete = userService.findUserById(userIdForDelete);
 
@@ -377,5 +471,63 @@ public class ServiceFacade {
         Community community = communityService.findCommunityById(communityId);
 
         communityService.kickUserFromCommunityById(userForDelete, community, userWhoDeletes);
+
+        logger.info(String.format("the user with id = %d is kicked out of community with id = %d.", userIdForDelete, communityId));
+    }
+
+    @Transactional(readOnly = true)
+    public ProfileInfoDto findProfile(Integer id) {
+        return profileService.findProfile(id);
+    }
+
+    public CommunityDto findCommunity(Integer id) {
+        return communityService.getInfoCommunityById(id);
+    }
+
+    public List<CommunityInfoDto> getCommunitiesUserJoined(int id) {
+
+        User user = userService.findUserById(id);
+
+        return communityService.findCommunitiesUserJoined(user);
+    }
+
+    public Set<UserDto> getUsersWhoJoinedCommunity(int id) {
+
+        Community community = communityService.findCommunityById(id);
+
+        return communityService.findUsersJoinedCommunity(id);
+    }
+
+    public List<ProfileInfoDto> findProfilesByCriteria(FindProfileCriteriaDto findProfileCriteriaDto) {
+        return profileService.findProfilesByCriteria(findProfileCriteriaDto);
+    }
+
+    @Transactional
+    public void setStatusInProfile(Integer id, String status) {
+
+        Profile profile = profileService.findProfileById(id);
+
+        profileService.setStatusProfile(profile, status);
+    }
+
+    @Transactional
+    public void setAgeInProfile(Integer id, Integer age) {
+
+        Profile profile = profileService.findProfileById(id);
+
+        profileService.setAgeProfile(profile, age);
+    }
+
+    @Transactional
+    public void setGenderInProfile(Integer id, Gender gender) {
+
+        Profile profile = profileService.findProfileById(id);
+
+        profileService.setGenderProfile(profile, gender);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserDto> getFriends(Integer currentUserId) {
+        return friendInvitationService.findFriendsByUserId(currentUserId);
     }
 }

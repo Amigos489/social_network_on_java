@@ -1,141 +1,237 @@
-package social_network.Service;
+package social_network.service;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.springframework.stereotype.Service;
+import social_network.dto.*;
 import social_network.entity.*;
-import social_network.exception.community.*;
-import social_network.primarykey.CreatorCommunityPrimaryKey;
-import social_network.primarykey.UserPostPrimaryKey;
+import social_network.exception.*;
+import social_network.mapper.CommunityMapper;
+import social_network.mapper.PostInCommunityMapper;
 import social_network.repository.CommunityRepository;
-import social_network.repository.CreatorCommunityRepository;
-import social_network.repository.PostRepository;
-import social_network.repository.UserPostRepository;
+import social_network.repository.PostInCommunityRepository;
 
 import java.util.List;
+import java.util.Set;
 
+@Service
 public class CommunityService {
+
+    private final String MESSAGE_COMMUNITY_NOT_FOUND = "community with id = %d not found.";
+
+    private final String MESSAGE_USER_NOT_IN_COMMUNITY = "user with id = %d not in community with id = %d.";
+
+    private final String MESSAGE_USER_ALREADY_IN_COMMUNITY = "user with id = %d already in community with id = %d.";
+
+    private final String MESSAGE_USER_NOT_CREATOR_COMMUNITY = "user with id = %d not creator in community with id = %d.";
+
+    private final String MESSAGE_USER_CREATOR_COMMUNITY = "user with id = %d creator in community with id = %d.";
+
+    private final Logger logger = LogManager.getLogger(CommunityService.class);
+
+    private final PostInCommunityMapper postInCommunityMapper;
+
+    private final CommunityMapper communityMapper;
 
     private final CommunityRepository communityRepository;
 
-    private final CreatorCommunityRepository creatorCommunityRepository;
+    private final PostInCommunityRepository postInCommunityRepository;
 
-    private final UserPostRepository userPostRepository;
+    public CommunityService(PostInCommunityMapper postInCommunityMapper,
+                            CommunityMapper communityMapper,
+                            CommunityRepository communityRepository,
+                            PostInCommunityRepository postInCommunityRepository) {
 
-    private final PostRepository postRepository;
+        this.postInCommunityMapper = postInCommunityMapper;
 
-    public CommunityService(CommunityRepository communityRepository, CreatorCommunityRepository creatorCommunityRepository,
-                            UserPostRepository userPostRepository, PostRepository postRepository) {
+        this.communityMapper = communityMapper;
+
         this.communityRepository = communityRepository;
-        this.creatorCommunityRepository = creatorCommunityRepository;
-        this.userPostRepository = userPostRepository;
-        this.postRepository = postRepository;
+
+        this.postInCommunityRepository = postInCommunityRepository;
     }
 
-    public Community createCommunity(String name, String description, User creator) {
+    public CommunityInfoDto createCommunity(String name, String description, User creator) {
 
-        Community community = new Community(name, description);
+        logger.info("create community: name = {}, description = {}, creator id = {}.", name, description, creator.getId());
 
-        communityRepository.create(community);
+        Community community = new Community(name, description, creator);
 
-        CreatorCommunityPrimaryKey primaryKey = new CreatorCommunityPrimaryKey(creator, community);
+        community = communityRepository.create(community);
 
-        CreatorCommunity creatorCommunity = new CreatorCommunity(primaryKey);
+        logger.info("community created: id = {}, name = {}, description = {}, creator id = {}.",
+                community.getId(),
+                name,
+                description,
+                creator.getId());
 
-        creatorCommunityRepository.create(creatorCommunity);
-
-        return community;
+        return communityMapper.doCommunityInfoDto(community);
     }
 
-    public void deleteCommunityById(Community community, User user) {
+    public void deleteCommunity(Community community, User user) {
 
-        if (creatorCommunityRepository.isUserCreatorCommunityById(user.getId(), community.getId())) {
+        logger.info("deleting a community with an id = {} by a user with id = {}.", community.getId(), user.getId());
 
-            CreatorCommunity creatorCommunity = creatorCommunityRepository.findById(new CreatorCommunityPrimaryKey(user, community));
+        if (!communityRepository.isUserCreatorCommunityById(user.getId(), community.getId())) {
 
-            creatorCommunityRepository.delete(creatorCommunity);
+            logger.error(String.format(MESSAGE_USER_NOT_CREATOR_COMMUNITY, user.getId(), community.getId()));
 
-            List<Post> posts = userPostRepository.findAllPostByCommunityId(community.getId());
-
-            userPostRepository.deleteAllByCommunityId(community.getId());
-
-            postRepository.deletePosts(posts);
-
-            for (User userFromCommunity : community.getUsers()) {
-                userFromCommunity.getCommunities().remove(community);
-            }
-
-            communityRepository.delete(community);
-        }
-    }
-
-    public List<User> joinCommunityById(User user, Community community) {
-
-        if (creatorCommunityRepository.isUserCreatorCommunityById(user.getId(), community.getId())) {
-
-            throw new CommunityException("User creator this community");
+            throw new CommunityException(String.format(MESSAGE_USER_NOT_CREATOR_COMMUNITY, user.getId(), community.getId()));
         }
 
-        if (!communityRepository.isUserInCommunity(user.getId(), community.getId())) {
+        logger.info("deleting posts from the community with an id = {}.", community.getId());
+        postInCommunityRepository.deleteAllByCommunityId(community.getId());
 
-            return communityRepository.addUserById(user, community.getId());
+        for (User userFromCommunity : community.getUsers()) {
+            userFromCommunity.getCommunities().remove(community);
         }
 
-        throw new UserAlreadyJoinedCommunityException(user.getId(), community.getId());
+        communityRepository.delete(community);
+        logger.info("community with id = {} deleted by user with id = {}.", community.getId(), user.getId());
     }
 
-    public List<User> leaveCommunityById(User user, Community community) {
+    public void userJoiningCommunity(User user, Community community) {
+
+        logger.info("user with id = {} join community with id = {}.", user.getId(), community.getId());
+
+        if (communityRepository.isUserCreatorCommunityById(user.getId(), community.getId())) {
+
+            logger.error(String.format(MESSAGE_USER_CREATOR_COMMUNITY, user.getId(), community.getId()));
+
+            throw new CommunityException(String.format(MESSAGE_USER_CREATOR_COMMUNITY, user.getId(), community.getId()));
+        }
 
         if (communityRepository.isUserInCommunity(user.getId(), community.getId())) {
 
-            return communityRepository.deleteUserById(user, community);
+            logger.error(String.format(MESSAGE_USER_ALREADY_IN_COMMUNITY, user.getId(), community.getId()));
+
+            throw new CommunityException(String.format(MESSAGE_USER_ALREADY_IN_COMMUNITY, user.getId(), community.getId()));
         }
 
-        throw new ErrorDeletingException(String.format("The user with id = %d is not in the community with id = %d", user.getId(), community.getId()));
+        communityRepository.addUserById(user, community.getId());
+        logger.info("user with id = {} joined community with id = {}.", user.getId(), community.getId());
     }
 
-    public List<User> kickUserFromCommunityById(User userForKick, Community community, User userWhoKick) {
+    public void userLeavingCommunity(User user, Community community) {
 
-        if (creatorCommunityRepository.isUserCreatorCommunityById(userWhoKick.getId(), community.getId())) {
+        logger.info("user with id = {} leave community with id = {}.", user.getId(), community.getId());
 
-            communityRepository.deleteUserById(userForKick, community);
+        if (!communityRepository.isUserInCommunity(user.getId(), community.getId())) {
+
+            logger.error(String.format(MESSAGE_USER_NOT_IN_COMMUNITY, user.getId(), community.getId()));
+
+            throw new CommunityException(String.format(MESSAGE_USER_NOT_IN_COMMUNITY, user.getId(), community.getId()));
         }
 
-        throw new ErrorDeletingException(String.format("User with id = %d cannot kick a user with id = %d", userWhoKick.getId(), userForKick.getId()));
+        communityRepository.deleteUserById(user, community);
+
+        logger.info("user with id = {} leaving community with id = {}.", user.getId(), community.getId());
     }
 
-    public AuthorPostInCommunity publishPostInCommunityById(Post post, Community community, User authorPost) {
+    public void kickUserFromCommunityById(User userForKick, Community community, User userWhoKick) {
 
-        if (!communityRepository.isUserInCommunity(authorPost.getId(), community.getId()) &&
-        !creatorCommunityRepository.isUserCreatorCommunityById(authorPost.getId(), community.getId())) {
+        logger.info("kick a user with id = {} from a community with id = {}. The user id who deletes = {}.",
+                userForKick.getId(),
+                community.getId(),
+                userWhoKick.getId());
 
-            throw new ErrorAddingException(String.format("The user with id = %d is not in the community with id = %d", authorPost.getId(), community.getId()));
+        if (!communityRepository.isUserCreatorCommunityById(userWhoKick.getId(), community.getId())) {
+
+            logger.error(String.format(MESSAGE_USER_NOT_CREATOR_COMMUNITY, userWhoKick.getId(), userForKick.getId()));
+
+            throw new CommunityException(String.format(MESSAGE_USER_NOT_CREATOR_COMMUNITY, userWhoKick.getId(), userForKick.getId()));
         }
 
-        UserPostPrimaryKey primaryKey = new UserPostPrimaryKey(authorPost, post, community);
-
-        AuthorPostInCommunity userPost = new AuthorPostInCommunity(primaryKey);
-
-        return userPostRepository.create(userPost);
+        communityRepository.deleteUserById(userForKick, community);
+        logger.info("user with id = {} kicked out of community with id = {}. user id who kicked = {}.",
+                userForKick.getId(),
+                community.getId(),
+                userWhoKick.getId());
     }
 
-    public void deletePostFromCommunity(Post post, Community community, User user) {
+    public PostInCommunityDto publishPostInCommunityById(String content, Community community, User author) {
 
-        if (creatorCommunityRepository.isUserCreatorCommunityById(user.getId(), community.getId())) {
+        logger.info("publish post in community with id = {} by user with id = {}.", community.getId(), author.getId());
 
-            AuthorPostInCommunity userPost = new AuthorPostInCommunity(new UserPostPrimaryKey(user, post, community));
+        if (!communityRepository.isUserInCommunity(author.getId(), community.getId()) &&
+        !communityRepository.isUserCreatorCommunityById(author.getId(), community.getId())) {
 
-            userPostRepository.delete(userPost);
+            logger.error(String.format(MESSAGE_USER_NOT_IN_COMMUNITY, author.getId(), community.getId()));
+            throw new CommunityException(String.format(MESSAGE_USER_NOT_IN_COMMUNITY, author.getId(), community.getId()));
         }
 
-        throw new ErrorDeletingException(String.format("User with id = %d cannot delete a post in community with id = %d", user.getId(), community.getId()));
+        PostInCommunity postInCommunity = new PostInCommunity(content, author, community);
+
+        postInCommunity = postInCommunityRepository.create(postInCommunity);
+
+        logger.info("post with id {} in community with id = {} by user with id = {} published.", postInCommunity.getId(), community.getId(), author.getId());
+        return postInCommunityMapper.doPostInCommunityDto(postInCommunity);
+    }
+
+    public void deletePostFromCommunity(Integer postId, Community community, User user) {
+
+        logger.info("delete post with id = {} from community with id = {}. the user id who deletes = {}", postId, community.getId(), user.getId());
+
+        if (!communityRepository.isUserCreatorCommunityById(user.getId(), community.getId())) {
+
+            logger.error(String.format(MESSAGE_USER_NOT_CREATOR_COMMUNITY, user.getId(), community.getId()));
+
+            throw new CommunityException(String.format(MESSAGE_USER_NOT_CREATOR_COMMUNITY, user.getId(), community.getId()));
+        }
+
+        PostInCommunity postInCommunity = postInCommunityRepository.findById(postId);
+
+        logger.info("post with id = {} from community with id = {} deleted. the user id who deletes = {}", postId, community.getId(), user.getId());
+        postInCommunityRepository.delete(postInCommunity);
     }
 
     public Community findCommunityById(Integer id) {
 
+        logger.info("find community by id = {}", id);
+
         Community community = communityRepository.findById(id);
 
-        if(community == null) {
-            throw new CommunityNotFoundException(String.format("Community with id = %d not found.", id));
+        if (community == null) {
+            logger.error(String.format(MESSAGE_COMMUNITY_NOT_FOUND, id));
+            throw new NotFoundException(String.format(MESSAGE_COMMUNITY_NOT_FOUND, id));
         }
 
         return community;
+    }
+
+    public List<CommunityInfoDto> findCommunitiesUserJoined(User user) {
+
+        logger.info("find communities user with id = {} joined.", user.getId());
+
+        List<Community> communities = communityRepository.findUserJoined(user);
+
+        return communityMapper.doCommunityInfoDtoList(communities);
+    }
+
+    public Set<UserDto> findUsersJoinedCommunity(Integer id) {
+
+        logger.info("find users joined community with id = {}.", id);
+
+        Community community = communityRepository.findFetchUsersById(id);
+
+        CommunityDto communityDto = communityMapper.doCommunityDto(community);
+
+        return communityDto.users();
+    }
+
+    public CommunityDto getInfoCommunityById(Integer id) {
+
+        logger.info("get info community with id = {}.", id);
+
+        Community community = communityRepository.findAllFetchById(id);
+
+        if (community == null) {
+
+            logger.error(String.format(MESSAGE_COMMUNITY_NOT_FOUND, id));
+
+            throw new NotFoundException(String.format(MESSAGE_COMMUNITY_NOT_FOUND, id));
+        }
+
+        return communityMapper.doCommunityDto(community);
     }
 }

@@ -1,18 +1,21 @@
 package social_network.repository;
 
+import org.springframework.stereotype.Repository;
 import social_network.entity.Chat;
 import social_network.entity.User;
 import org.hibernate.Session;
 
 import java.util.List;
+import java.util.Set;
 
+@Repository
 public class UserRepository extends AbstractRepository<User, Integer> {
 
     public UserRepository(Session session) {
         super(User.class, session);
     }
 
-    public List<Chat> getAllChatsById(Integer id) {
+    public Set<Chat> getAllChatsById(Integer id) {
 
         User user = findById(id);
 
