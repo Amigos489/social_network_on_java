@@ -12,7 +12,7 @@
 
 \- Docker Desktop
 
-\-PostgreSQL
+\- PostgreSQL
 
 
 
